@@ -10,6 +10,10 @@ export function GetDevices() {
   return window['go']['main']['App']['GetDevices']();
 }
 
+export function GetSavedMappings(arg1) {
+  return window['go']['main']['App']['GetSavedMappings'](arg1);
+}
+
 export function GetWheelActions(arg1) {
   return window['go']['main']['App']['GetWheelActions'](arg1);
 }

@@ -6,6 +6,8 @@ export function GetDeviceButtons(arg1:string):Promise<Array<main.Button>>;
 
 export function GetDevices():Promise<Array<main.Device>>;
 
+export function GetSavedMappings(arg1:string):Promise<main.DeviceMappings>;
+
 export function GetWheelActions(arg1:string):Promise<Array<main.WheelAction>>;
 
 export function SetButtonAction(arg1:string,arg2:number,arg3:string):Promise<void>;

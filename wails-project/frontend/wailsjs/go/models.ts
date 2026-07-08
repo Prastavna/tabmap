@@ -32,6 +32,20 @@ export namespace main {
 	        this.type = source["type"];
 	    }
 	}
+	export class DeviceMappings {
+	    buttons: Record<number, string>;
+	    wheels: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeviceMappings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.buttons = source["buttons"];
+	        this.wheels = source["wheels"];
+	    }
+	}
 	export class WheelAction {
 	    property: string;
 	    label: string;

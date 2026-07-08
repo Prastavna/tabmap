@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx      context.Context
+	configMu sync.Mutex
 }
 
 // Device represents an input device
@@ -32,6 +37,12 @@ type WheelAction struct {
 	Property      string `json:"property"`
 	Label         string `json:"label"`
 	CurrentAction string `json:"currentAction"`
+}
+
+// DeviceMappings holds the user-entered mappings persisted for one device
+type DeviceMappings struct {
+	Buttons map[int]string    `json:"buttons"`
+	Wheels  map[string]string `json:"wheels"`
 }
 
 // wheelProperties lists the xsetwacom properties that make up touch rings
@@ -57,11 +68,122 @@ func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
+// startup is called when the app starts. Saved mappings are re-applied in the
+// background because xsetwacom settings do not survive reboots or replugs.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.applySavedMappings()
 }
+
+// --- Config persistence -----------------------------------------------------
+
+func configPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "graphics-tablet-config", "config.json"), nil
+}
+
+func (a *App) loadConfig() map[string]*DeviceMappings {
+	cfg := map[string]*DeviceMappings{}
+	path, err := configPath()
+	if err != nil {
+		return cfg
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg
+	}
+	_ = json.Unmarshal(data, &cfg)
+	return cfg
+}
+
+func (a *App) saveConfig(cfg map[string]*DeviceMappings) error {
+	path, err := configPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+func (a *App) deviceMappings(cfg map[string]*DeviceMappings, deviceName string) *DeviceMappings {
+	m := cfg[deviceName]
+	if m == nil {
+		m = &DeviceMappings{}
+		cfg[deviceName] = m
+	}
+	if m.Buttons == nil {
+		m.Buttons = map[int]string{}
+	}
+	if m.Wheels == nil {
+		m.Wheels = map[string]string{}
+	}
+	return m
+}
+
+// GetSavedMappings returns the persisted mappings for a device (empty if none)
+func (a *App) GetSavedMappings(deviceName string) DeviceMappings {
+	a.configMu.Lock()
+	defer a.configMu.Unlock()
+	cfg := a.loadConfig()
+	return *a.deviceMappings(cfg, deviceName)
+}
+
+func (a *App) rememberButton(deviceName string, buttonNumber int, action string) {
+	a.configMu.Lock()
+	defer a.configMu.Unlock()
+	cfg := a.loadConfig()
+	m := a.deviceMappings(cfg, deviceName)
+	if strings.TrimSpace(action) == "" {
+		delete(m.Buttons, buttonNumber)
+	} else {
+		m.Buttons[buttonNumber] = action
+	}
+	_ = a.saveConfig(cfg)
+}
+
+func (a *App) rememberWheel(deviceName string, property string, action string) {
+	a.configMu.Lock()
+	defer a.configMu.Unlock()
+	cfg := a.loadConfig()
+	m := a.deviceMappings(cfg, deviceName)
+	if strings.TrimSpace(action) == "" {
+		delete(m.Wheels, property)
+	} else {
+		m.Wheels[property] = action
+	}
+	_ = a.saveConfig(cfg)
+}
+
+// applySavedMappings re-applies every persisted mapping. Devices that are not
+// currently connected simply fail their xsetwacom calls and are skipped.
+func (a *App) applySavedMappings() {
+	a.configMu.Lock()
+	cfg := a.loadConfig()
+	a.configMu.Unlock()
+
+	for deviceName, m := range cfg {
+		if m == nil {
+			continue
+		}
+		for num, action := range m.Buttons {
+			_ = applyButton(deviceName, num, action)
+		}
+		for prop, action := range m.Wheels {
+			_ = applyWheel(deviceName, prop, action)
+		}
+	}
+}
+
+// --- Device queries ----------------------------------------------------------
 
 // GetDevices returns all detected input devices from xsetwacom
 func (a *App) GetDevices() ([]Device, error) {
@@ -151,6 +273,8 @@ func (a *App) GetWheelActions(deviceName string) ([]WheelAction, error) {
 	return actions, nil
 }
 
+// --- Setting mappings ----------------------------------------------------------
+
 // formatAction converts a user-friendly action string into xsetwacom's
 // action mapping syntax, passed as a single argument.
 //
@@ -177,9 +301,7 @@ func formatAction(action string) string {
 	return "key " + strings.Join(keys, " ")
 }
 
-// SetButtonAction sets the action for a specific button.
-// An empty action restores the button to its default (plain button press).
-func (a *App) SetButtonAction(deviceName string, buttonNumber int, action string) error {
+func applyButton(deviceName string, buttonNumber int, action string) error {
 	var mapping string
 	if strings.TrimSpace(action) == "" {
 		// Restore default: the button emits its own button number
@@ -192,24 +314,10 @@ func (a *App) SetButtonAction(deviceName string, buttonNumber int, action string
 	if err != nil || strings.Contains(string(out), "Unable to parse") {
 		return fmt.Errorf("failed to set button %d to '%s': %s", buttonNumber, mapping, strings.TrimSpace(string(out)))
 	}
-
 	return nil
 }
 
-// SetWheelAction sets the action for a touch ring / strip direction.
-// An empty action restores the default scroll behaviour for that property.
-func (a *App) SetWheelAction(deviceName string, property string, action string) error {
-	valid := false
-	for _, wp := range wheelProperties {
-		if wp.Property == property {
-			valid = true
-			break
-		}
-	}
-	if !valid {
-		return fmt.Errorf("unknown wheel property: %s", property)
-	}
-
+func applyWheel(deviceName string, property string, action string) error {
 	var mapping string
 	if strings.TrimSpace(action) == "" {
 		// Defaults per the wacom driver: rings/strips scroll (buttons 4/5)
@@ -226,6 +334,36 @@ func (a *App) SetWheelAction(deviceName string, property string, action string) 
 	if err != nil || strings.Contains(string(out), "Unable to parse") {
 		return fmt.Errorf("failed to set %s to '%s': %s", property, mapping, strings.TrimSpace(string(out)))
 	}
+	return nil
+}
 
+// SetButtonAction sets the action for a specific button and persists it.
+// An empty action restores the button to its default (plain button press).
+func (a *App) SetButtonAction(deviceName string, buttonNumber int, action string) error {
+	if err := applyButton(deviceName, buttonNumber, action); err != nil {
+		return err
+	}
+	a.rememberButton(deviceName, buttonNumber, action)
+	return nil
+}
+
+// SetWheelAction sets the action for a touch ring / strip direction and persists it.
+// An empty action restores the default scroll behaviour for that property.
+func (a *App) SetWheelAction(deviceName string, property string, action string) error {
+	valid := false
+	for _, wp := range wheelProperties {
+		if wp.Property == property {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return fmt.Errorf("unknown wheel property: %s", property)
+	}
+
+	if err := applyWheel(deviceName, property, action); err != nil {
+		return err
+	}
+	a.rememberWheel(deviceName, property, action)
 	return nil
 }
