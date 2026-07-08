@@ -1,0 +1,5 @@
+build/
+node_modules
+frontend/dist
+auto-imports.d.ts
+components.d.ts

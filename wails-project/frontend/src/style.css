@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* Light theme configuration */
+:root {
+  --color-mode: 'light';
+}
+
+body {
+  background-color: #ffffff;
+  color: #374151;
+}
