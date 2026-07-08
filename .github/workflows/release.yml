@@ -57,7 +57,7 @@ jobs:
         run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 
       - name: Build and package
-        run: ./build/linux/package.sh deb
+        run: ./scripts/package.sh deb
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

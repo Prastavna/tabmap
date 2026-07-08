@@ -1,4 +1,4 @@
-<img src="frontend/public/favicon.svg" alt="TabMap logo" width="96" height="96"/>
+<img src="./frontend/public/favicon.svg" alt="TabMap logo" width="96" height="96"/>
 
 # TabMap
 
@@ -62,13 +62,13 @@ sudo apt remove tabmap
 Running the binary directly launches the app fine, but without an installed `.desktop` entry your dock/taskbar won't show the TabMap icon (desktop environments key off a registered menu entry rather than the running window). Install a per-user entry into `~/.local` (no root required):
 
 ```bash
-./build/linux/install.sh
+./scripts/install.sh
 ```
 
 TabMap will appear in your application launcher with its icon, and pinning it to the dock will show the icon correctly. To remove it later:
 
 ```bash
-./build/linux/uninstall.sh
+./scripts/uninstall.sh
 ```
 
 #### Build your own .deb
@@ -77,7 +77,7 @@ To produce a distributable package from source you need [nfpm](https://nfpm.gore
 
 ```bash
 go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-./build/linux/package.sh deb      # → build/bin/tabmap_<version>_<arch>.deb
+./scripts/package.sh deb          # → build/bin/tabmap_<version>_<arch>.deb
 ```
 
 The version is derived from the latest git tag (`git describe --tags`), falling back to `0.0.0`. Pass `rpm` instead of `deb` to build an RPM.
