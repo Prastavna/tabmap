@@ -40,7 +40,7 @@ else
 fi
 
 echo "Building $DISPLAY_NAME $VERSION ($ARCH) ..."
-wails build -clean
+wails build -clean -tags webkit2_41
 
 BIN="$REPO_ROOT/build/bin/$APP_NAME"
 [[ -x "$BIN" ]] || { echo "Error: build did not produce $BIN" >&2; exit 1; }
