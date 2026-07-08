@@ -1,4 +1,6 @@
-# Graphics Tablet Configuration
+<img src="frontend/public/favicon.svg" alt="TabMap logo" width="96" height="96"/>
+
+# TabMap
 
 A simple, modern GUI application for configuring graphics tablets on Linux, built with Wails, Go, and Vue.js with light theme.
 
@@ -30,20 +32,55 @@ A simple, modern GUI application for configuring graphics tablets on Linux, buil
 
 ## Installation
 
-### Option 1: Download Binary
-1. Download the latest binary from the releases page
-2. Make it executable: `chmod +x wails-project`
-3. Run: `./wails-project`
+### Option 1: Debian package (.deb) — recommended
 
-### Option 2: Build from Source
+Download the latest `tabmap_<version>_<arch>.deb` from the [releases page](https://github.com/Prastavna/tabmap/releases) and install it:
+
+```bash
+sudo apt install ./tabmap_0.1.0_amd64.deb
+```
+
+This installs the binary, registers the `.desktop` entry, and installs the icon into the system icon theme — so TabMap shows up in your application launcher **with its icon** and the dock icon works correctly. To remove it:
+
+```bash
+sudo apt remove tabmap
+```
+
+### Option 2: Build from source
+
 1. Install [Wails v2](https://wails.io/docs/gettingstarted/installation)
 2. Clone this repository
 3. Build the application:
    ```bash
-   cd wails-project
+   cd tabmap
    wails build
    ```
-4. Run the built binary: `./build/bin/wails-project`
+4. Run the built binary: `./build/bin/tabmap`
+
+#### Desktop integration (per-user install)
+
+Running the binary directly launches the app fine, but without an installed `.desktop` entry your dock/taskbar won't show the TabMap icon (desktop environments key off a registered menu entry rather than the running window). Install a per-user entry into `~/.local` (no root required):
+
+```bash
+./build/linux/install.sh
+```
+
+TabMap will appear in your application launcher with its icon, and pinning it to the dock will show the icon correctly. To remove it later:
+
+```bash
+./build/linux/uninstall.sh
+```
+
+#### Build your own .deb
+
+To produce a distributable package from source you need [nfpm](https://nfpm.goreleaser.com/):
+
+```bash
+go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+./build/linux/package.sh deb      # → build/bin/tabmap_<version>_<arch>.deb
+```
+
+The version is derived from the latest git tag (`git describe --tags`), falling back to `0.0.0`. Pass `rpm` instead of `deb` to build an RPM.
 
 ## Usage
 
@@ -75,7 +112,7 @@ Note: `xsetwacom` exposes all wheel/strip properties on every pad device, so dir
 ### Project Structure
 
 ```
-wails-project/
+tabmap/
 ├── app.go              # Go backend with tablet detection and xsetwacom integration
 ├── main.go             # Main application entry point
 ├── frontend/           # Vue.js frontend
@@ -119,9 +156,13 @@ wails build -clean
 
 ### Configuration not persisting
 - Check permissions on your home directory
-- Ensure the application can write to `~/.graphic-tab-config`
+- Ensure the application can write to your user config directory (`tabmap/config.json`)
 
 ### Buttons not working after configuration
 - Try unplugging and reconnecting your tablet
 - Restart your display manager: `sudo systemctl restart display-manager`
 - Check if your desktop environment has conflicting shortcuts
+
+## Attributions
+
+App icon: [Tablet](https://www.svgrepo.com/svg/76985/tablet) by [SVG Repo](https://www.svgrepo.com/), licensed [CC0](https://www.svgrepo.com/page/licensing/#CC0) (public domain).

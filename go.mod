@@ -1,4 +1,4 @@
-module wails-project
+module tabmap
 
 go 1.23
 

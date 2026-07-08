@@ -82,7 +82,7 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "graphics-tablet-config", "config.json"), nil
+	return filepath.Join(dir, "tabmap", "config.json"), nil
 }
 
 func (a *App) loadConfig() map[string]*DeviceMappings {

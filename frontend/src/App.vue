@@ -4,7 +4,7 @@
       <!-- Header: title + device dropdown -->
       <div class="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 class="text-2xl font-bold text-gray-800">Graphics Tablet Configuration</h1>
+          <h1 class="text-2xl font-bold text-gray-800">TabMap</h1>
           <p class="text-sm text-gray-500">Buttons, touch ring &amp; wheel — changes are saved and re-applied on startup</p>
         </div>
         <div class="flex items-center gap-2">
